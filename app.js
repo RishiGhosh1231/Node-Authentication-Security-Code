@@ -3,8 +3,8 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const ejs = require('ejs');
 const mongoose = require('mongoose');
-const md5 = require('md5');
-const sha512 = require('js-sha512');
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
 const app = express();
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static('public'));
@@ -18,7 +18,7 @@ const userSchema = new mongoose.Schema({
 });
 
 const User = mongoose.model('User', userSchema);
-console.log(sha512('mypassword123'));
+
 
 app.get('/', (req, res)=>{
     res.render('home');
@@ -33,32 +33,37 @@ app.get('/register', (req, res)=>{
 });
 
 app.post('/register', (req ,res)=>{
-    const newUser = new User({
-        email: req.body.username,
-        password: sha512(req.body.password)
+    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+        const newUser = new User({
+            email: req.body.username,
+            password: hash
+        }); 
+        newUser.save((err)=>{
+            if(err){
+                console.log(err);
+            } else{
+                res.render('secrets');
+            }
+        });
     });
 
-    newUser.save((err)=>{
-        if(err){
-            console.log(err);
-        } else{
-            res.render('secrets');
-        }
-    });
+
 });
 
 app.post('/login', (req, res)=>{
     const usernane = req.body.username;
-    const password = sha512(req.body.password);
+    const password = req.body.password;
 
     User.findOne({email: usernane}, (err, foundUser)=>{
         if(err){
             console.log(err);
         } else{
             if(foundUser){
-                if(foundUser.password === password){
-                    res.render('secrets');
-                }
+                bcrypt.compare(password, foundUser.password, function(err, result) {
+                    if(result === true){
+                        res.render('secrets');
+                    }
+                });
             };
         }
     });
